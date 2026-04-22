@@ -1,15 +1,3 @@
-<?php
-require_once "includes/config_session.php";
-
-$_SESSION["test"] = "raiyanMatadar";
-
-if (isset($_SESSION["test"])) {
-    echo $_SESSION["test"];
-}
-
-
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>

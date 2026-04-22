@@ -1,32 +1,39 @@
 <?php 
 
+require_once "includes/config_session.php";
+
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
   
-    $username = $_POST["username"];
-    $email = $_POST["email"];
+    $username = trim($_POST["username"]);
+    $email = trim($_POST["email"]);
     $password = $_POST["password"];
-    $hashed = password_hash($password, PASSWORD_DEFAULT);
-  
-    require_once "includes/dbh.inc.php";
-  
-    $query = "INSERT INTO users (username, email, password_hash) 
-              VALUES (:username, :email, :password_hash);";
     
-    $stmt = $pdo->prepare($query);
-    $stmt->bindParam(":username",$username);
-    $stmt->bindParam(":email",$email);
-    $stmt->bindParam(":password_hash", $hashed);
+    if (strlen($password) < 8) {
+        $error = "Password must be at least 8 characters.";
+    } else {
+        $hashed = password_hash($password, PASSWORD_DEFAULT);
+      
+        require_once "includes/dbh.inc.php";
+      
+        $query = "INSERT INTO users (username, email, password_hash) 
+                  VALUES (:username, :email, :password_hash);";
+        
+        $stmt = $pdo->prepare($query);
+        $stmt->bindParam(":username",$username);
+        $stmt->bindParam(":email",$email);
+        $stmt->bindParam(":password_hash", $hashed);
 
-    $stmt->execute();
+        $stmt->execute();
+        
+        $user_id = $pdo->lastInsertId();
+        
+        $_SESSION["user_id"] = $user_id;
+        $_SESSION["username"] = $username;
+        $_SESSION["email"] = $email;
 
-    header("Location: enter_room_data.php");
-    exit(); 
-
-    //$_SESSION["username"] = $username;
-    //$_SESSION["email"] = $email;
-    //$_SESSION["password"] = $password;
-    //$_SESSION["hashed"] = $hashed;
-
+        header("Location: dashboard.php");
+        exit(); 
+    }
 } 
 
 
@@ -236,6 +243,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <div>
 
+      <?php if (isset($error)): ?>
+        <div data-status="error"><?= htmlspecialchars($error) ?></div>
+      <?php endif; ?>
+
       <form method="post" action="register.php" id="registerForm">
 
         <div>
@@ -287,6 +298,37 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     </div>
 
   </div>
+
+  <script>
+    const passwordInput = document.getElementById('password');
+    const strengthLabel = document.getElementById('strengthLabel');
+
+    passwordInput.addEventListener('input', function() {
+      const password = this.value;
+      let strength = 0;
+      
+      if (password.length >= 8) strength++;
+      if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+      if (password.match(/\d/)) strength++;
+      if (password.match(/[^a-zA-Z\d]/)) strength++;
+
+      if (password.length === 0) {
+        strengthLabel.textContent = '';
+      } else if (strength <= 1) {
+        strengthLabel.textContent = 'Weak';
+        strengthLabel.style.color = '#ef4444';
+      } else if (strength === 2) {
+        strengthLabel.textContent = 'Fair';
+        strengthLabel.style.color = '#f59e0b';
+      } else if (strength === 3) {
+        strengthLabel.textContent = 'Good';
+        strengthLabel.style.color = '#3b82f6';
+      } else {
+        strengthLabel.textContent = 'Strong';
+        strengthLabel.style.color = '#10b981';
+      }
+    });
+  </script>
 
 </body>
 </html>

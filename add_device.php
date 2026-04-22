@@ -7,30 +7,45 @@ if (!isset($_SESSION["user_id"])) {
     exit();
 }
 
+$user_id = $_SESSION["user_id"];
+
+require_once "includes/dbh.inc.php";
+
+// Get user's rooms
+$query = "SELECT * FROM rooms WHERE user_id = :user_id ORDER BY name ASC";
+$stmt = $pdo->prepare($query);
+$stmt->bindParam(":user_id", $user_id);
+$stmt->execute();
+$rooms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $user_id = $_SESSION["user_id"];
-    $room = trim($_POST["room"]);
-    $device = trim($_POST["device"]);
+    $room_id = $_POST["room_id"];
+    $device_name = trim($_POST["device_name"]);
+    $device_type = $_POST["device_type"];
     
-    require_once "includes/dbh.inc.php";
-
-    $query = "INSERT INTO rooms (user_id, name) VALUES (:user_id, :room);";
-    $stmt = $pdo->prepare($query);
-    $stmt->bindParam(":user_id", $user_id);
-    $stmt->bindParam(":room", $room);
-    $stmt->execute();
+    // Build features based on device type
+    $features = "";
+    if ($device_type === "Thermostat") {
+        $features = json_encode(["temp_min" => 18, "temp_max" => 30, "current_temp" => 24]);
+    } elseif ($device_type === "Fan") {
+        $features = json_encode(["speed" => "Medium", "speeds" => ["Low", "Medium", "High"]]);
+    } elseif ($device_type === "Lamp") {
+        $features = json_encode(["brightness" => 50, "color" => "Warm"]);
+    } elseif ($device_type === "Smart AC") {
+        $features = json_encode(["temp" => 22, "mode" => "Cool"]);
+    }
     
-    $room_id = $pdo->lastInsertId();
-
-    $query = "INSERT INTO devices (user_id, room_id, device_name, device_type, is_connected) 
-              VALUES (:user_id, :room_id, :device, 'Generic', 1);";
+    $query = "INSERT INTO devices (user_id, room_id, device_name, device_type, features, is_connected) 
+              VALUES (:user_id, :room_id, :device_name, :device_type, :features, 0)";
     $stmt = $pdo->prepare($query);
     $stmt->bindParam(":user_id", $user_id);
     $stmt->bindParam(":room_id", $room_id);
-    $stmt->bindParam(":device", $device);
+    $stmt->bindParam(":device_name", $device_name);
+    $stmt->bindParam(":device_type", $device_type);
+    $stmt->bindParam(":features", $features);
     $stmt->execute();
-
-    $success = "Room and device added successfully!";
+    
+    $success = "Device created! Click 'Connect' on the dashboard to activate it.";
 }
 
 ?>
@@ -40,7 +55,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DevsEntity — Add Room</title>
+  <title>DevsEntity — Add Device</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -55,14 +70,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       padding: 24px;
     }
 
-    /* ── Container ── */
     body > div {
       width: 100%;
       max-width: 460px;
       text-align: center;
     }
 
-    /* ── Brand pill ── */
     body > div > span {
       display: inline-block;
       font-size: 12px;
@@ -75,7 +88,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       margin-bottom: 32px;
     }
 
-    /* ── Heading ── */
     body > div > h1 {
       font-size: 36px;
       font-weight: 700;
@@ -85,7 +97,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     body > div > h1 > span { color: #2563eb; }
 
-    /* ── Subtitle ── */
     body > div > p {
       font-size: 15px;
       color: #666;
@@ -93,7 +104,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       margin-bottom: 40px;
     }
 
-    /* ── Card ── */
     body > div > div {
       background: #fff;
       border: 1px solid #e5e7eb;
@@ -103,7 +113,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       margin-bottom: 24px;
     }
 
-    /* ── Form groups ── */
     body > div > div > form > div {
       margin-bottom: 18px;
     }
@@ -116,7 +125,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       margin-bottom: 6px;
     }
 
-    body > div > div > form > div > input {
+    body > div > div > form > div > input,
+    body > div > div > form > div > select {
       width: 100%;
       padding: 11px 14px;
       border: 1.5px solid #d1d5db;
@@ -129,14 +139,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
       outline: none;
     }
 
-    body > div > div > form > div > input:focus {
+    body > div > div > form > div > input:focus,
+    body > div > div > form > div > select:focus {
       border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37,99,235,.12);
     }
 
-    body > div > div > form > div > input::placeholder { color: #9ca3af; }
-
-    /* ── Submit button ── */
     body > div > div > form > button {
       width: 100%;
       padding: 13px;
@@ -159,25 +167,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     body > div > div > form > button:active { transform: scale(.97); }
 
-    /* ── Divider ── */
-    body > div > div > div {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: #bbb;
-      font-size: 13px;
-      margin: 24px 0 0;
-    }
-
-    body > div > div > div::before,
-    body > div > div > div::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: #e5e7eb;
-    }
-
-    /* ── Dashboard link ── */
     body > div > a {
       display: block;
       margin-top: 20px;
@@ -189,7 +178,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     body > div > a:hover { text-decoration: underline; }
 
-    /* ── Error / Success messages ── */
     [data-status] {
       font-size: 13px;
       padding: 10px 14px;
@@ -212,10 +200,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <span>DevsEntity</span>
 
-    <h1>Add a new<br><span>room.</span></h1>
+    <h1>Add a new<br><span>device.</span></h1>
     <p>
-      Configure your smart room below.<br>
-      Takes just a moment.
+      Create and configure a smart device.<br>
+      Choose the type and features.
     </p>
 
     <div>
@@ -224,25 +212,47 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <div data-status="success"><?= htmlspecialchars($success) ?></div>
       <?php endif; ?>
 
-      <form action="enter_room_data.php" method="post">
+      <?php if (count($rooms) === 0): ?>
+        <div data-status="error">You need to create a room first before adding devices.</div>
+        <a href="enter_room_data.php">Create a Room</a>
+      <?php else: ?>
+        <form method="post" action="add_device.php">
 
-        <div>
-          <label for="room">room</label>
-          <input type="text" id="room" name="room" placeholder="e.g. Master room">
-        </div>
+          <div>
+            <label for="room_id">Room</label>
+            <select id="room_id" name="room_id" required>
+              <option value="">Select a room...</option>
+              <?php foreach ($rooms as $room): ?>
+                <option value="<?= $room["id"] ?>"><?= htmlspecialchars($room["name"]) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
 
-        <div>
-          <label for="device">Device</label>
-          <input type="text" id="device" name="device" placeholder="e.g. Smart Light">
-        </div>
+          <div>
+            <label for="device_name">Device Name</label>
+            <input type="text" id="device_name" name="device_name" placeholder="e.g. Smart Lamp" required>
+          </div>
 
-        <button type="submit">Submit</button>
+          <div>
+            <label for="device_type">Device Type</label>
+            <select id="device_type" name="device_type" required>
+              <option value="">Select device type...</option>
+              <option value="Thermostat">Thermostat</option>
+              <option value="Fan">Fan</option>
+              <option value="Lamp">Lamp</option>
+              <option value="Smart AC">Smart AC</option>
+              <option value="Generic">Generic Device</option>
+            </select>
+          </div>
 
-      </form>
+          <button type="submit">Create Device</button>
+
+        </form>
+      <?php endif; ?>
 
     </div>
 
-    <a href="dashboard.php">← View Dashboard</a>
+    <a href="dashboard.php">← Back to Dashboard</a>
 
   </div>
 

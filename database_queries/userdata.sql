@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS userdata(
+	id INT(11) NOT NULL AUTO_INCREMENT,
+    user_id INT UNSIGNED NOT NULL,
+    room VARCHAR(30) NOT NULL,
+    device VARCHAR(30) NOT NULL,
+    state VARCHAR(30) NOT NULL DEFAULT 'Off',
+    set_routine INT(4) NOT NULL DEFAULT 0,
+    energy_usage FLOAT NOT NULL DEFAULT 0,
+    features JSON,
+    is_connected TINYINT(1) DEFAULT 0,
+    malfunction TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
